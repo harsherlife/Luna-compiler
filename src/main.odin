@@ -16,5 +16,11 @@ main ::proc()
     {
         errorf("error in reading file\n");
     }
-    fmt.printf("source code {}\n",len(src_code));
+    tokens := tokenize(src_code);
+    // for token in tokens 
+    // {
+    //     delete(token.ident);
+    // }
+    // delete(tokens);
+    fmt.printf("{}\n",tokens);
 }
