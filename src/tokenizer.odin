@@ -19,7 +19,7 @@ TokenType :: enum
 
 Loc :: struct
 {
-    row_number,line_number : u16
+    row_number,offset : uint
 }
 
 Token :: struct
@@ -33,11 +33,17 @@ Tokens :: [dynamic]Token;
 
 Tokenizer :: struct
 {
-    idx,len : int,
+    idx,len : uint,
+    row,start_of_row : uint,
     source_code : []u8
 }
 
-peek :: proc(tokenizer : ^Tokenizer,offset : int = 0) -> u8
+get_loc :: proc(tokenizer : ^Tokenizer,buff_len : uint) -> Loc
+{
+    return {tokenizer.row+1,tokenizer.idx-tokenizer.start_of_row-buff_len+1};
+}
+
+peek :: proc(tokenizer : ^Tokenizer,offset : uint = 0) -> u8
 {
     if tokenizer.idx+offset >= tokenizer.len 
     {
@@ -55,8 +61,8 @@ consume :: proc(tokenizer : ^Tokenizer) -> u8
 
 tokenize :: proc(source_code : []u8) -> Tokens
 {
-    tokens : Tokens = {};
-    tokenizer : Tokenizer = {len = len(source_code),source_code = source_code};
+    tokens := Tokens{};
+    tokenizer := Tokenizer{len = len(source_code),source_code = source_code};
     buff := strings.Builder{};
     for peek(&tokenizer) != 0 
     {
@@ -68,7 +74,7 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 strings.write_byte(&buff,consume(&tokenizer));
             }
             str := strings.to_string(buff);
-            append(&tokens,Token{type = TokenType.ident, ident = str, loc = {0,0}})
+            append(&tokens,Token{type = TokenType.ident, ident = str, loc = get_loc(&tokenizer,len(str))})
         }
         else if libc.isdigit(cast(i32)peek(&tokenizer)) != 0
         {
@@ -85,13 +91,19 @@ tokenize :: proc(source_code : []u8) -> Tokens
                     strings.write_byte(&buff,consume(&tokenizer));
                 }
                 str := strings.to_string(buff);
-                append(&tokens,Token{type=TokenType.float_literal, ident = str , loc = {0,0}});
+                append(&tokens,Token{type=TokenType.float_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
             }
             else 
             {
                 str := strings.to_string(buff);
-                append(&tokens,Token{type=TokenType.int_literal, ident = str , loc = {0,0}});
+                append(&tokens,Token{type=TokenType.int_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
             }
+        }
+        else if peek(&tokenizer) == '\n'
+        {
+            consume(&tokenizer);
+            tokenizer.row += 1;
+            tokenizer.start_of_row = tokenizer.idx;
         }
         else 
         {
