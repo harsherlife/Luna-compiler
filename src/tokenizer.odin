@@ -91,7 +91,12 @@ tokenize :: proc(source_code : []u8) -> Tokens
                     strings.write_byte(&buff,consume(&tokenizer));
                 }
                 str := strings.to_string(buff);
-                append(&tokens,Token{type=TokenType.float_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
+                append(&tokens,Token{type=TokenType.double_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
+                if peek(&tokenizer) == 'f'
+                {
+                    tokens[len(tokens)-1].type = TokenType.float_literal;
+                    consume(&tokenizer);
+                }
             }
             else 
             {
