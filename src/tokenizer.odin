@@ -15,6 +15,10 @@ TokenType :: enum
     string_literal,
     float_literal,
     double_literal,
+    function,
+    auto,
+    assignment,
+    semicolon,
 }
 
 Loc :: struct
@@ -74,7 +78,20 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 strings.write_byte(&buff,consume(&tokenizer));
             }
             str := strings.to_string(buff);
-            append(&tokens,Token{type = TokenType.ident, ident = str, loc = get_loc(&tokenizer,len(str))})
+            if str == "fn"
+            {
+                append(&tokens,Token{type = TokenType.function, loc = get_loc(&tokenizer,len(str))});
+                delete(str);
+            }
+            else if str == "auto"
+            {
+                append(&tokens,Token{type = TokenType.auto, loc = get_loc(&tokenizer,len(str))});
+                delete(str);
+            }
+            else 
+            {
+                append(&tokens,Token{type = TokenType.ident, ident = str, loc = get_loc(&tokenizer,len(str))});
+            }
         }
         else if libc.isdigit(cast(i32)peek(&tokenizer)) != 0
         {
@@ -116,9 +133,39 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 }
                 strings.write_byte(&buff,consume(&tokenizer));
             }
-            consume(&tokenizer);
             str := strings.to_string(buff);
             append(&tokens,Token{type = TokenType.string_literal, ident = str,loc = get_loc(&tokenizer,len(str))});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == '('
+        {
+            append(&tokens,Token{type = TokenType.open_paren, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == ')'
+        {
+            append(&tokens,Token{type = TokenType.close_paren, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == '{'
+        {
+            append(&tokens,Token{type = TokenType.open_brace, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == '}'
+        {
+            append(&tokens,Token{type = TokenType.close_brace, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == '='
+        {
+            append(&tokens,Token{type = TokenType.assignment, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
+        }
+        else if peek(&tokenizer) == ';'
+        {
+            append(&tokens,Token{type = TokenType.semicolon, loc = get_loc(&tokenizer,1)});
+            consume(&tokenizer);
         }
         else if peek(&tokenizer) == '\n'
         {
