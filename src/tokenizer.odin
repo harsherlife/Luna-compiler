@@ -47,13 +47,13 @@ get_loc :: proc(tokenizer : ^Tokenizer,buff_len : uint) -> Loc
     return {tokenizer.row+1,tokenizer.idx-tokenizer.start_of_row-buff_len+1};
 }
 
-peek :: proc(tokenizer : ^Tokenizer,offset : uint = 0) -> u8
+peek :: proc(tokenizer : ^Tokenizer,offset : uint = 0) -> (value: u8, ok: bool) #optional_ok
 {
     if tokenizer.idx+offset >= tokenizer.len 
     {
-        return 0;
+        return 0,false;
     }
-    return tokenizer.source_code[tokenizer.idx+offset];
+    return tokenizer.source_code[tokenizer.idx+offset],true;
 }
 
 consume :: proc(tokenizer : ^Tokenizer) -> u8
@@ -68,9 +68,14 @@ tokenize :: proc(source_code : []u8) -> Tokens
     tokens := Tokens{};
     tokenizer := Tokenizer{len = len(source_code),source_code = source_code};
     buff := strings.Builder{};
-    for peek(&tokenizer) != 0 
+    for 
     {
-        if libc.isalpha(cast(i32)peek(&tokenizer)) != 0
+        ch, ok := peek(&tokenizer);
+        if !ok
+        {
+            break;
+        }
+        else if libc.isalpha(cast(i32)ch) != 0
         {
             strings.write_byte(&buff,consume(&tokenizer));
             for libc.isalpha(cast(i32)peek(&tokenizer)) != 0
@@ -93,7 +98,7 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 append(&tokens,Token{type = TokenType.ident, ident = str, loc = get_loc(&tokenizer,len(str))});
             }
         }
-        else if libc.isdigit(cast(i32)peek(&tokenizer)) != 0
+        else if libc.isdigit(cast(i32)ch) != 0
         {
             strings.write_byte(&buff,consume(&tokenizer));
             for libc.isdigit(cast(i32)peek(&tokenizer)) != 0
@@ -121,13 +126,13 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 append(&tokens,Token{type=TokenType.int_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
             }
         }
-        else if peek(&tokenizer) == '\"'
+        else if ch == '\"'
         {
             consume(&tokenizer);
             for 
             {
-                ch :=  peek(&tokenizer);
-                if ch == '\"' || ch == 0
+                chr :=  peek(&tokenizer);
+                if chr == '\"' || chr == 0
                 {
                     break;
                 }
@@ -137,37 +142,37 @@ tokenize :: proc(source_code : []u8) -> Tokens
             append(&tokens,Token{type = TokenType.string_literal, ident = str,loc = get_loc(&tokenizer,len(str))});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == '('
+        else if ch == '('
         {
             append(&tokens,Token{type = TokenType.open_paren, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == ')'
+        else if ch == ')'
         {
             append(&tokens,Token{type = TokenType.close_paren, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == '{'
+        else if ch == '{'
         {
             append(&tokens,Token{type = TokenType.open_brace, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == '}'
+        else if ch == '}'
         {
             append(&tokens,Token{type = TokenType.close_brace, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == '='
+        else if ch == '='
         {
             append(&tokens,Token{type = TokenType.assignment, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == ';'
+        else if ch == ';'
         {
             append(&tokens,Token{type = TokenType.semicolon, loc = get_loc(&tokenizer,1)});
             consume(&tokenizer);
         }
-        else if peek(&tokenizer) == '\n'
+        else if ch == '\n'
         {
             consume(&tokenizer);
             tokenizer.row += 1;
