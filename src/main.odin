@@ -17,10 +17,14 @@ main ::proc()
         errorf("error in reading file\n");
     }
     tokens := tokenize(src_code);
-    // for token in tokens 
-    // {
-    //     delete(token.ident);
-    // }
-    // delete(tokens);
-    fmt.printf("{}\n",tokens);
+    defer delete(tokens);
+    for token in tokens 
+    {
+        fmt.printf("{}\n",token);
+    }
+
+    for token in tokens 
+    {
+        delete(token.ident);
+    }
 }

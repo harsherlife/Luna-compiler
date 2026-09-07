@@ -104,6 +104,22 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 append(&tokens,Token{type=TokenType.int_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
             }
         }
+        else if peek(&tokenizer) == '\"'
+        {
+            consume(&tokenizer);
+            for 
+            {
+                ch :=  peek(&tokenizer);
+                if ch == '\"' || ch == 0
+                {
+                    break;
+                }
+                strings.write_byte(&buff,consume(&tokenizer));
+            }
+            consume(&tokenizer);
+            str := strings.to_string(buff);
+            append(&tokens,Token{type = TokenType.string_literal, ident = str,loc = get_loc(&tokenizer,len(str))});
+        }
         else if peek(&tokenizer) == '\n'
         {
             consume(&tokenizer);
