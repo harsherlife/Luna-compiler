@@ -1,5 +1,4 @@
 fn main()
 {
     auto x = 32;
-    auto y = "hell";
 }

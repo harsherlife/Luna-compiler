@@ -18,11 +18,11 @@ main ::proc()
     }
     tokens := tokenize(src_code);
     defer delete(tokens);
-    for token in tokens 
-    {
-        fmt.printf("{}\n",token);
-    }
 
+    assembly := generate(tokens);
+    defer delete(assembly);
+    
+    fmt.printf("{}\n",assembly);
     for token in tokens 
     {
         delete(token.ident);
