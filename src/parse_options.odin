@@ -7,7 +7,7 @@ import "core:path/slashpath";
 import "core:os";
 import "core:strings";
 
-errorf :: proc(format_str : string,format_args : ..any)
+errorf :: proc(format_str : string,format_args : ..any) -> !
 {
     fmt.printf(format_str,..format_args);
     os.exit(1);

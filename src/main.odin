@@ -19,12 +19,16 @@ main ::proc()
     tokens := tokenize(src_code);
     defer delete(tokens);
 
-    assembly := generate(tokens);
-    defer delete(assembly);
-    
-    fmt.printf("{}\n",assembly);
+    ast := parse_ast(tokens);
+
+    fmt.printf("{}\n",ast);
     for token in tokens 
     {
         delete(token.ident);
     }
+    for func in ast.funcs
+    {
+        delete(func.stmts);
+    }
+    delete(ast.funcs);
 }

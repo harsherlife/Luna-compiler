@@ -84,7 +84,7 @@ tokenize :: proc(source_code : []u8) -> Tokens
         else if libc.isalpha(cast(i32)ch) != 0
         {
             strings.write_byte(&buff,consume_tokenizer(&tokenizer));
-            for libc.isalpha(cast(i32)peek_tokenizer(&tokenizer)) != 0
+            for libc.isalnum(cast(i32)peek_tokenizer(&tokenizer)) != 0
             {
                 strings.write_byte(&buff,consume_tokenizer(&tokenizer));
             }

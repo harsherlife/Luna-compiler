@@ -1,4 +1,4 @@
 fn main()
 {
-    auto x = 32;
+    i32 x = 32;
 }
