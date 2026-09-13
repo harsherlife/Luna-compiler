@@ -18,6 +18,7 @@ TokenType :: enum
     function,
     auto,
     assignment,
+    plus,
     semicolon,
     type,
 }
@@ -177,6 +178,11 @@ tokenize :: proc(source_code : []u8) -> Tokens
             append(&tokens,Token{type = TokenType.assignment, loc = get_loc(&tokenizer,1)});
             consume_tokenizer(&tokenizer);
         }
+        else if ch == '+'
+        {
+            append(&tokens,Token{type = TokenType.plus, loc = get_loc(&tokenizer,1)});
+            consume_tokenizer(&tokenizer);
+        }
         else if ch == ';'
         {
             append(&tokens,Token{type = TokenType.semicolon, loc = get_loc(&tokenizer,1)});
@@ -195,4 +201,12 @@ tokenize :: proc(source_code : []u8) -> Tokens
         buff = {};
     }
     return tokens;
+}
+
+dump_tokens :: proc(tokens : Tokens)
+{
+    for token in tokens 
+    {
+        fmt.printf("{}\n",token);
+    }
 }

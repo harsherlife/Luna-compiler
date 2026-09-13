@@ -6,7 +6,7 @@ import "core:mem";
 get_arena :: proc() -> mem.Arena
 {
     arena := mem.Arena{};
-    mem.arena_init(&arena,make([]u8,4*1024));
+    mem.arena_init(&arena,make([]u8,4*1024*1024));
     return arena;
 }
 

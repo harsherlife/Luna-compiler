@@ -108,6 +108,16 @@ try_consume_err :: proc(parser : ^Parser,type : TokenType,err_msg : string) -> T
     errorf(err_msg);
 }
 
+try_consume_tok :: proc(parser: ^Parser,type : TokenType) -> bool
+{
+    if try_peek_parser(parser,type)
+    {
+        consume_parser(parser);
+        return true;
+    }
+    return false;
+}
+
 try_consume :: proc(parser : ^Parser,type : TokenType) -> (Token,bool)
 {
     if peek_parser(parser).type == type
@@ -118,7 +128,7 @@ try_consume :: proc(parser : ^Parser,type : TokenType) -> (Token,bool)
 }
 
 
-parse_term :: proc(parser : ^Parser) -> (^Term) 
+parse_term :: proc(parser : ^Parser) -> ^Term
 {
     term : ^Term;
     if try_peek_parser(parser,TokenType.ident)
@@ -134,6 +144,24 @@ parse_term :: proc(parser : ^Parser) -> (^Term)
 }
 
 
+parse_expr :: proc(parser : ^Parser) -> ^Expr
+{
+    term := parse_term(parser);
+    if try_consume_tok(parser,TokenType.plus)
+    {
+        rhs_term := parse_term(parser);
+        lhs := alloc_and_set(Expr,term);
+        rhs := alloc_and_set(Expr,rhs_term);
+        bin_expr_add := alloc_and_set(BinExprAdd,BinExprAdd{lhs = lhs,rhs = rhs});
+        bin_expr := alloc_and_set(BinExpr,bin_expr_add);
+        return alloc_and_set(Expr,bin_expr);
+    }
+    else 
+    {
+        return alloc_and_set(Expr,term);
+    }
+}
+
 parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool 
 {
     if try_peek_parser(parser,TokenType.type) == false
@@ -144,8 +172,8 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
     if type.ident == "i32"
     {
         ident := try_consume_err(parser,TokenType.ident,"Expected identifier\n");
-        try_consume_err(parser,TokenType.assignment,"Expected assignment\n");
-        append(&func.stmts,DeclStmt{ident = ident,expr = alloc_and_set(Expr,parse_term(parser)),type = type.ident});
+        try_consume_err(parser,TokenType.assignment,"Expected assignment\n");        
+        append(&func.stmts,DeclStmt{ident = ident,expr = parse_expr(parser),type = type.ident});
         try_consume_err(parser,TokenType.semicolon,"expected semicolon\n");
         return true;
     }
@@ -170,7 +198,7 @@ parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
     }
     consume_parser(parser);
 
-    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = alloc_and_set(Expr,parse_term(parser))});
+    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = parse_expr(parser)});
     try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
     return true;
 }
@@ -237,17 +265,71 @@ parse_ast :: proc(tokens : Tokens) -> AST
 }
 import "core:fmt";
 
+
+dump_term :: proc(term : Term) 
+{
+    switch t in term
+    {
+        case TermIdent :
+        {
+            fmt.printf(" {} ",t.ident.ident);
+        }
+        case TermLiteral : 
+        {
+            fmt.printf(" {} ",t.lit.ident);
+        }
+    }
+}
+
+dump_bin_expr_add :: proc(bin_expr_add : BinExprAdd)
+{
+    dump_expr(bin_expr_add.lhs^);
+    fmt.printf(" + ");
+    dump_expr(bin_expr_add.rhs^);
+}
+
+dump_bin_expr :: proc(bin_expr : BinExpr) 
+{
+    switch v in bin_expr
+    {
+        case ^BinExprAdd:
+        {
+            dump_bin_expr_add(v^);
+        }
+
+    }
+}
+
+dump_expr :: proc(expr : Expr)
+{
+    switch v in expr
+    {
+        case ^Term:
+        {
+            dump_term(v^);
+        }
+        case ^BinExpr:
+        {
+            dump_bin_expr(v^);
+        }
+    }
+}
+
 dump_stmt :: proc(stmt : Stmt)
 {
     switch st in stmt
     {
         case DeclStmt:
         {
-            fmt.printf("{} {} {}\n",st.ident,st.expr^,st.type);
+            fmt.printf("{} {} = ",st.type,st.ident.ident);
+            dump_expr(st.expr^);
+            fmt.printf("\n");
         }
         case AssignStmt:
         {
-            fmt.printf("{} {}\n",st.ident,st.expr^);
+            fmt.printf("{} = ",st.ident.ident);
+            dump_expr(st.expr^);
+            fmt.printf("\n");
         }
     }
 }
