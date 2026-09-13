@@ -20,8 +20,8 @@ main ::proc()
     defer delete(tokens);
 
     ast := parse_ast(tokens);
+    dump_ast(&ast);
 
-    fmt.printf("{}\n",ast);
     for token in tokens 
     {
         delete(token.ident);

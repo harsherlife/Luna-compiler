@@ -102,20 +102,35 @@ try_consume :: proc(parser : ^Parser,type : TokenType) -> (Token,bool)
 }
 
 
+parse_term :: proc(parser : ^Parser) -> (Term,bool) #optional_ok
+{
+    if try_peek_parser(parser,TokenType.ident)
+    {
+        return TermIdent{consume_parser(parser)},true;
+    }
+    else if try_peek_parser(parser,TokenType.int_literal)
+    {
+        return TermLiteral{consume_parser(parser)},true;
+    }
+    else 
+    {
+        return {},false;
+    }
+}
+
 
 parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool 
 {
-    type,ok := try_consume(parser,TokenType.type);
-    if !ok 
+    if try_peek_parser(parser,TokenType.type) == false
     {
         return false;
     }
-    else if type.ident == "i32"
+    type := consume_parser(parser);
+    if type.ident == "i32"
     {
         ident := try_consume_err(parser,TokenType.ident,"Expected identifier\n");
         try_consume_err(parser,TokenType.assignment,"Expected assignment\n");
-        lit := try_consume_err(parser,TokenType.int_literal,"Expected int-literal\n");
-        append(&func.stmts,DeclStmt{ident = ident,expr = TermLiteral{lit},type = type.ident});
+        append(&func.stmts,DeclStmt{ident = ident,expr = parse_term(parser),type = type.ident});
         try_consume_err(parser,TokenType.semicolon,"expected semicolon\n");
         return true;
     }
@@ -128,7 +143,20 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
 
 parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
 {
-    return false;
+    term,ok1 := parse_term(parser);
+    if !ok1 || !try_peek_parser(parser,TokenType.assignment)
+    {
+        return false;
+    }
+    tok,ok := term.(TermLiteral);
+    if ok
+    {
+        errorf("Can't assign to literal\n");
+    }
+    consume_parser(parser);
+    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = parse_term(parser)});
+    try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
+    return true;
 }
 
 parse_stmt :: proc(parser : ^Parser,func : ^Func)
@@ -190,4 +218,16 @@ parse_ast :: proc(tokens : Tokens) -> AST
         append(&ast.funcs,parse_function(&parser));
     }
     return ast;
+}
+import "core:fmt";
+dump_ast :: proc(ast : ^AST)
+{
+    for func in ast.funcs
+    {
+        fmt.printf("function : {}\n",func.func_name);
+        for stmt in func.stmts
+        {
+            fmt.printf("{}\n",stmt);
+        }
+    }
 }
