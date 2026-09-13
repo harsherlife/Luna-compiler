@@ -18,17 +18,33 @@ Term :: union
     TermLiteral,
 };
 
+BinExprAdd :: struct
+{
+    lhs,rhs : ^Expr
+};
+
+BinExpr :: union
+{
+    ^BinExprAdd
+};
+
+Expr :: union
+{
+    ^Term,
+    ^BinExpr,
+};
+
 DeclStmt :: struct
 {
     ident : Token,
-    expr : Term,
+    expr : ^Expr,
     type : string
-}
+};
 
 AssignStmt :: struct
 {
     ident : Token,
-    expr : Term
+    expr : ^Expr,
 };
 
 Stmt :: union
@@ -102,20 +118,19 @@ try_consume :: proc(parser : ^Parser,type : TokenType) -> (Token,bool)
 }
 
 
-parse_term :: proc(parser : ^Parser) -> (Term,bool) #optional_ok
+parse_term :: proc(parser : ^Parser) -> (^Term) 
 {
+    term : ^Term;
     if try_peek_parser(parser,TokenType.ident)
     {
-        return TermIdent{consume_parser(parser)},true;
+        term = alloc_and_set(Term,TermIdent{consume_parser(parser)});
     }
     else if try_peek_parser(parser,TokenType.int_literal)
     {
-        return TermLiteral{consume_parser(parser)},true;
+        term = alloc_and_set(Term,TermLiteral{consume_parser(parser)});
     }
-    else 
-    {
-        return {},false;
-    }
+    else {}
+    return term;
 }
 
 
@@ -130,7 +145,7 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
     {
         ident := try_consume_err(parser,TokenType.ident,"Expected identifier\n");
         try_consume_err(parser,TokenType.assignment,"Expected assignment\n");
-        append(&func.stmts,DeclStmt{ident = ident,expr = parse_term(parser),type = type.ident});
+        append(&func.stmts,DeclStmt{ident = ident,expr = alloc_and_set(Expr,parse_term(parser)),type = type.ident});
         try_consume_err(parser,TokenType.semicolon,"expected semicolon\n");
         return true;
     }
@@ -143,8 +158,8 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
 
 parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
 {
-    term,ok1 := parse_term(parser);
-    if !ok1 || !try_peek_parser(parser,TokenType.assignment)
+    term := parse_term(parser);
+    if term == nil || !try_peek_parser(parser,TokenType.assignment)
     {
         return false;
     }
@@ -154,7 +169,8 @@ parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
         errorf("Can't assign to literal\n");
     }
     consume_parser(parser);
-    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = parse_term(parser)});
+
+    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = alloc_and_set(Expr,parse_term(parser))});
     try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
     return true;
 }
@@ -220,6 +236,22 @@ parse_ast :: proc(tokens : Tokens) -> AST
     return ast;
 }
 import "core:fmt";
+
+dump_stmt :: proc(stmt : Stmt)
+{
+    switch st in stmt
+    {
+        case DeclStmt:
+        {
+            fmt.printf("{} {} {}\n",st.ident,st.expr^,st.type);
+        }
+        case AssignStmt:
+        {
+            fmt.printf("{} {}\n",st.ident,st.expr^);
+        }
+    }
+}
+
 dump_ast :: proc(ast : ^AST)
 {
     for func in ast.funcs
@@ -227,7 +259,7 @@ dump_ast :: proc(ast : ^AST)
         fmt.printf("function : {}\n",func.func_name);
         for stmt in func.stmts
         {
-            fmt.printf("{}\n",stmt);
+            dump_stmt(stmt);
         }
     }
 }
