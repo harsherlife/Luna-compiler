@@ -23,9 +23,15 @@ BinExprAdd :: struct
     lhs,rhs : ^Expr
 };
 
+BinExprSub :: struct
+{
+    lhs,rhs : ^Expr
+};
+
 BinExpr :: union
 {
-    ^BinExprAdd
+    ^BinExprAdd,
+    ^BinExprSub,
 };
 
 Expr :: union
@@ -149,11 +155,18 @@ parse_expr :: proc(parser : ^Parser) -> ^Expr
     term := parse_term(parser);
     if try_consume_tok(parser,TokenType.plus)
     {
-        rhs_term := parse_term(parser);
+        rhs := parse_expr(parser);
         lhs := alloc_and_set(Expr,term);
-        rhs := alloc_and_set(Expr,rhs_term);
         bin_expr_add := alloc_and_set(BinExprAdd,BinExprAdd{lhs = lhs,rhs = rhs});
         bin_expr := alloc_and_set(BinExpr,bin_expr_add);
+        return alloc_and_set(Expr,bin_expr);
+    }
+    else if try_consume_tok(parser,TokenType.minus)
+    {
+        rhs := parse_expr(parser);
+        lhs := alloc_and_set(Expr,term);
+        bin_expr_sub := alloc_and_set(BinExprSub,BinExprSub{lhs = lhs,rhs = rhs});
+        bin_expr := alloc_and_set(BinExpr,bin_expr_sub);
         return alloc_and_set(Expr,bin_expr);
     }
     else 
@@ -266,51 +279,65 @@ parse_ast :: proc(tokens : Tokens) -> AST
 import "core:fmt";
 
 
-dump_term :: proc(term : Term) 
+dump_term :: proc(term : ^Term) 
 {
     switch t in term
     {
         case TermIdent :
         {
-            fmt.printf(" {} ",t.ident.ident);
+            fmt.printf("{}",t.ident.ident);
         }
         case TermLiteral : 
         {
-            fmt.printf(" {} ",t.lit.ident);
+            fmt.printf("{}",t.lit.ident);
         }
     }
 }
 
-dump_bin_expr_add :: proc(bin_expr_add : BinExprAdd)
+dump_bin_expr_add :: proc(bin_expr_add : ^BinExprAdd)
 {
-    dump_expr(bin_expr_add.lhs^);
-    fmt.printf(" + ");
-    dump_expr(bin_expr_add.rhs^);
+    fmt.printf("(+, lhs = ")
+    dump_expr(bin_expr_add.lhs);
+    fmt.printf(" ,rhs = ");
+    dump_expr(bin_expr_add.rhs);
+    fmt.printf(")");
 }
 
-dump_bin_expr :: proc(bin_expr : BinExpr) 
+dump_bin_expr_sub :: proc(bin_expr_sub : ^BinExprSub)
+{
+    fmt.printf("(-,lhs= ")
+    dump_expr(bin_expr_sub.lhs);
+    fmt.printf(" ,rhs= ");
+    dump_expr(bin_expr_sub.rhs);
+    fmt.printf(")");
+}
+
+dump_bin_expr :: proc(bin_expr : ^BinExpr) 
 {
     switch v in bin_expr
     {
         case ^BinExprAdd:
         {
-            dump_bin_expr_add(v^);
+            dump_bin_expr_add(v);
         }
-
+        case ^BinExprSub:
+        {
+            dump_bin_expr_sub(v);
+        }
     }
 }
 
-dump_expr :: proc(expr : Expr)
+dump_expr :: proc(expr : ^Expr)
 {
     switch v in expr
     {
         case ^Term:
         {
-            dump_term(v^);
+            dump_term(v);
         }
         case ^BinExpr:
         {
-            dump_bin_expr(v^);
+            dump_bin_expr(v);
         }
     }
 }
@@ -322,13 +349,13 @@ dump_stmt :: proc(stmt : Stmt)
         case DeclStmt:
         {
             fmt.printf("{} {} = ",st.type,st.ident.ident);
-            dump_expr(st.expr^);
+            dump_expr(st.expr);
             fmt.printf("\n");
         }
         case AssignStmt:
         {
             fmt.printf("{} = ",st.ident.ident);
-            dump_expr(st.expr^);
+            dump_expr(st.expr);
             fmt.printf("\n");
         }
     }

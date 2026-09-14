@@ -19,6 +19,7 @@ TokenType :: enum
     auto,
     assignment,
     plus,
+    minus,
     semicolon,
     type,
 }
@@ -181,6 +182,11 @@ tokenize :: proc(source_code : []u8) -> Tokens
         else if ch == '+'
         {
             append(&tokens,Token{type = TokenType.plus, loc = get_loc(&tokenizer,1)});
+            consume_tokenizer(&tokenizer);
+        }
+        else if ch == '-'
+        {
+            append(&tokens,Token{type = TokenType.minus, loc = get_loc(&tokenizer,1)});
             consume_tokenizer(&tokenizer);
         }
         else if ch == ';'
