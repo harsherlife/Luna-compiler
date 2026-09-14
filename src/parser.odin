@@ -35,10 +35,22 @@ BinExprSub :: struct
     lhs,rhs : ^Expr
 };
 
+BinExprMult :: struct
+{
+    lhs,rhs : ^Expr
+};
+
+BinExprDiv :: struct
+{
+    lhs,rhs : ^Expr
+};
+
 BinExpr :: union
 {
     ^BinExprAdd,
     ^BinExprSub,
+    ^BinExprMult,
+    ^BinExprDiv,
 };
 
 Expr :: union
@@ -89,7 +101,7 @@ Parser :: struct
     tokens : Tokens,
 };
 
-try_peek_parser :: proc(parser : ^Parser,type : TokenType, offset :uint = 0) -> bool
+try_peek_parser :: proc(parser : ^Parser,type : TokenType, offset : uint = 0) -> bool
 {
     tok,ok := peek_parser(parser,offset);
     return ok && tok.type == type;
@@ -161,40 +173,80 @@ parse_term :: proc(parser : ^Parser) -> ^Term
         {
             append(&func.args,parse_expr(parser));
         }
-        term = alloc_and_set(Term,func);
+        term = alloc_and_set(Term,func); 
     }
     else {}
     return term;
 }
 
 
-parse_expr :: proc(parser : ^Parser) -> ^Expr
+get_precedence :: proc (type : TokenType) -> i32
+{
+    #partial switch type
+    {
+        case TokenType.plus,TokenType.minus:
+            return 1;
+        case TokenType.mult,TokenType.div:
+            return 2;
+        case :
+            return -1;
+    }    
+}
+
+
+parse_expr :: proc(parser : ^Parser,prec : i32 = 0 ) -> ^Expr
 {
     term := parse_term(parser);
-    if try_consume_tok(parser,TokenType.plus)
+    lhs_expr := alloc_and_set(Expr,term);
+    for 
     {
-        rhs := parse_expr(parser);
-        lhs := alloc_and_set(Expr,term);
-        bin_expr_add := alloc_and_set(BinExprAdd,BinExprAdd{lhs = lhs,rhs = rhs});
-        bin_expr := alloc_and_set(BinExpr,bin_expr_add);
-        return alloc_and_set(Expr,bin_expr);
+        tok,ok := peek_parser(parser);
+        curr_prec := get_precedence(tok.type);
+        if ok && curr_prec != -1  && curr_prec >=  prec
+        {
+            op_type := consume_parser(parser).type;
+            rhs_expr := parse_expr(parser,curr_prec + 1);
+            bin_expr : ^BinExpr;
+            if rhs_expr != nil
+            {
+                #partial switch op_type
+                {
+                    case TokenType.plus :
+                    {
+                        bin_expr_add := alloc_and_set(BinExprAdd,BinExprAdd{lhs = lhs_expr,rhs = rhs_expr});
+                        bin_expr = alloc_and_set(BinExpr,bin_expr_add);
+                    }
+                    case TokenType.minus :
+                    {
+                        bin_expr_sub := alloc_and_set(BinExprSub,BinExprSub{lhs = lhs_expr,rhs = rhs_expr});
+                        bin_expr = alloc_and_set(BinExpr,bin_expr_sub);
+                    }
+                    case TokenType.mult:
+                    {
+                        bin_expr_mult := alloc_and_set(BinExprMult,BinExprMult{lhs = lhs_expr,rhs = rhs_expr});
+                        bin_expr = alloc_and_set(BinExpr,bin_expr_mult);
+                    }
+                    case TokenType.div:
+                    {
+                        bin_expr_div := alloc_and_set(BinExprDiv,BinExprDiv{lhs = lhs_expr,rhs = rhs_expr});
+                        bin_expr = alloc_and_set(BinExpr,bin_expr_div);
+                    }
+                    case :
+                        errorf("Unreachable\n");
+                }
+                lhs_expr = alloc_and_set(Expr,bin_expr);
+            }
+            else
+            {
+                errorf("Expected expression\n");
+            }
+        }
+        else 
+        {
+            break;
+        }
     }
-    else if try_consume_tok(parser,TokenType.minus)
-    {
-        rhs := parse_expr(parser);
-        lhs := alloc_and_set(Expr,term);
-        bin_expr_sub := alloc_and_set(BinExprSub,BinExprSub{lhs = lhs,rhs = rhs});
-        bin_expr := alloc_and_set(BinExpr,bin_expr_sub);
-        return alloc_and_set(Expr,bin_expr);
-    }
-    else if term != nil
-    {
-        return alloc_and_set(Expr,term);
-    }
-    else 
-    {
-        return nil;
-    }
+    return lhs_expr;
 }
 
 parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool 
@@ -337,21 +389,40 @@ dump_term :: proc(term : ^Term)
     }
 }
 
-dump_bin_expr_add :: proc(bin_expr_add : ^BinExprAdd)
+dump_bin_expr_add :: proc(bin_expr : ^BinExprAdd)
 {
     fmt.printf("(+, lhs = ")
-    dump_expr(bin_expr_add.lhs);
+    dump_expr(bin_expr.lhs);
     fmt.printf(" ,rhs = ");
-    dump_expr(bin_expr_add.rhs);
+    dump_expr(bin_expr.rhs);
     fmt.printf(")");
 }
 
-dump_bin_expr_sub :: proc(bin_expr_sub : ^BinExprSub)
+dump_bin_expr_sub :: proc(bin_expr : ^BinExprSub)
 {
-    fmt.printf("(-,lhs= ")
-    dump_expr(bin_expr_sub.lhs);
-    fmt.printf(" ,rhs= ");
-    dump_expr(bin_expr_sub.rhs);
+    fmt.printf("(-, lhs = ")
+    dump_expr(bin_expr.lhs);
+    fmt.printf(" ,rhs = ");
+    dump_expr(bin_expr.rhs);
+    fmt.printf(")");
+}
+
+dump_bin_expr_mult :: proc(bin_expr : ^BinExprMult)
+{
+    fmt.printf("(*, lhs = ")
+    dump_expr(bin_expr.lhs);
+    fmt.printf(" ,rhs = ");
+    dump_expr(bin_expr.rhs);
+    fmt.printf(")");
+}
+
+
+dump_bin_expr_div :: proc(bin_expr : ^BinExprDiv)
+{
+    fmt.printf("(/, lhs = ")
+    dump_expr(bin_expr.lhs);
+    fmt.printf(" ,rhs = ");
+    dump_expr(bin_expr.rhs);
     fmt.printf(")");
 }
 
@@ -366,6 +437,14 @@ dump_bin_expr :: proc(bin_expr : ^BinExpr)
         case ^BinExprSub:
         {
             dump_bin_expr_sub(v);
+        }
+        case ^BinExprMult :
+        {
+            dump_bin_expr_mult(v);
+        }
+        case ^BinExprDiv:
+        {
+            dump_bin_expr_div(v);
         }
     }
 }

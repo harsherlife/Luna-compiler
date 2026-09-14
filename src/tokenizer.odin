@@ -21,6 +21,8 @@ TokenType :: enum
     assignment,
     plus,
     minus,
+    mult,
+    div,
     semicolon,
     type,
 }
@@ -198,6 +200,16 @@ tokenize :: proc(source_code : []u8) -> Tokens
         else if ch == '-'
         {
             append(&tokens,Token{type = TokenType.minus, loc = get_loc(&tokenizer,1)});
+            consume_tokenizer(&tokenizer);
+        }
+        else if ch == '*'
+        {
+            append(&tokens,Token{type = TokenType.mult, loc = get_loc(&tokenizer,1)});
+            consume_tokenizer(&tokenizer);
+        }
+        else if ch == '/'
+        {
+            append(&tokens,Token{type = TokenType.div, loc = get_loc(&tokenizer,1)});
             consume_tokenizer(&tokenizer);
         }
         else if ch == ';'

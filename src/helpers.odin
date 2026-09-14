@@ -17,7 +17,7 @@ free_arena :: proc(arena : ^mem.Arena)
 }
 
 
-alloc_and_set :: proc($U:typeid,val : $T) -> ^U
+alloc_and_set :: proc($U : typeid,val : $T) -> ^U
 {
     ret := new(U);
     ret^ = val;
