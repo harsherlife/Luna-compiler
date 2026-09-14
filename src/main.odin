@@ -48,7 +48,7 @@ main ::proc()
         tokens := tokenize(src_code);
         time.stopwatch_stop(&clock);
 
-        fmt.printf("{} ms\n",get_time_micros(clock));
+        fmt.printf("tokens = {} microseconds\n",get_time_micros(clock));
         time.stopwatch_reset(&clock);
 
         time.stopwatch_start(&clock);
@@ -56,7 +56,7 @@ main ::proc()
         time.stopwatch_stop(&clock);
 
 
-        fmt.printf("{} ms\n",get_time_micros(clock));
+        fmt.printf("ast = {} microseconds\n",get_time_micros(clock));
         time.stopwatch_reset(&clock);
     }
     else
