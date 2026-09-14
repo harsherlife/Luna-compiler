@@ -16,6 +16,7 @@ TokenType :: enum
     float_literal,
     double_literal,
     function,
+    function_call,
     auto,
     assignment,
     plus,
@@ -66,6 +67,11 @@ consume_tokenizer :: proc(tokenizer : ^Tokenizer) -> u8
     return ret;
 }
 
+back :: proc(tokens : Tokens) -> ^Token
+{
+    return &tokens[len(tokens)-1];
+}
+
 tokenize :: proc(source_code : []u8) -> Tokens
 {
     types := make(map[string]i32); // just need a set so any value type works
@@ -108,6 +114,11 @@ tokenize :: proc(source_code : []u8) -> Tokens
             else 
             {
                 append(&tokens,Token{type = TokenType.ident, ident = str, loc = get_loc(&tokenizer,len(str))});
+                paren,ok := peek_tokenizer(&tokenizer);
+                if ok && paren == '('
+                {
+                    back(tokens).type = TokenType.function_call;
+                }
             }
         }
         else if libc.isdigit(cast(i32)ch) != 0
@@ -128,7 +139,7 @@ tokenize :: proc(source_code : []u8) -> Tokens
                 append(&tokens,Token{type=TokenType.double_literal, ident = str , loc = get_loc(&tokenizer,len(str))});
                 if peek_tokenizer(&tokenizer) == 'f'
                 {
-                    tokens[len(tokens)-1].type = TokenType.float_literal;
+                    back(tokens).type = TokenType.float_literal;
                     consume_tokenizer(&tokenizer);
                 }
             }

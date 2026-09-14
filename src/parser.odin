@@ -12,10 +12,17 @@ TermLiteral :: struct
     lit : Token
 };
 
+TermFunCall :: struct
+{
+    func_name : Token,
+    args : [dynamic]^Expr,
+}
+
 Term :: union
 {
     TermIdent,
     TermLiteral,
+    TermFunCall,
 };
 
 BinExprAdd :: struct
@@ -56,7 +63,8 @@ AssignStmt :: struct
 Stmt :: union
 {
     AssignStmt,
-    DeclStmt
+    DeclStmt,
+    Expr,
 };
 
 Stmts :: [dynamic]Stmt;
@@ -145,6 +153,16 @@ parse_term :: proc(parser : ^Parser) -> ^Term
     {
         term = alloc_and_set(Term,TermLiteral{consume_parser(parser)});
     }
+    else if try_peek_parser(parser,TokenType.function_call)
+    {
+        func := TermFunCall{func_name = consume_parser(parser)};
+        try_consume_err(parser,TokenType.open_paren,"Expected (\n");
+        for !try_consume_tok(parser,TokenType.close_paren)
+        {
+            append(&func.args,parse_expr(parser));
+        }
+        term = alloc_and_set(Term,func);
+    }
     else {}
     return term;
 }
@@ -169,9 +187,13 @@ parse_expr :: proc(parser : ^Parser) -> ^Expr
         bin_expr := alloc_and_set(BinExpr,bin_expr_sub);
         return alloc_and_set(Expr,bin_expr);
     }
-    else 
+    else if term != nil
     {
         return alloc_and_set(Expr,term);
+    }
+    else 
+    {
+        return nil;
     }
 }
 
@@ -199,21 +221,28 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
 
 parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
 {
-    term := parse_term(parser);
-    if term == nil || !try_peek_parser(parser,TokenType.assignment)
+    if !try_peek_parser(parser,TokenType.ident) || !try_peek_parser(parser,TokenType.assignment,1)
     {
         return false;
     }
-    tok,ok := term.(TermLiteral);
-    if ok
-    {
-        errorf("Can't assign to literal\n");
-    }
+    ident := consume_parser(parser);
     consume_parser(parser);
 
-    append(&func.stmts,AssignStmt{ident = term.(TermIdent).ident, expr = parse_expr(parser)});
+    append(&func.stmts,AssignStmt{ident = ident, expr = parse_expr(parser)});
     try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
     return true;
+}
+
+parse_stmt_expr :: proc(parser : ^Parser,func : ^Func) -> bool
+{
+    expr := parse_expr(parser);
+    if expr != nil
+    {
+        append(&func.stmts,expr^);
+        try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
+        return true;
+    }
+    return try_consume_tok(parser,TokenType.semicolon); // ; alone is a valid statement and not an expr so no need to add to stmts
 }
 
 parse_stmt :: proc(parser : ^Parser,func : ^Func)
@@ -223,6 +252,10 @@ parse_stmt :: proc(parser : ^Parser,func : ^Func)
         return;
     }
     else if parse_assign_stmt(parser,func)
+    {
+        return;
+    }
+    else if parse_stmt_expr(parser,func)
     {
         return;
     }
@@ -291,6 +324,16 @@ dump_term :: proc(term : ^Term)
         {
             fmt.printf("{}",t.lit.ident);
         }
+        case TermFunCall :
+        {
+            fmt.printf("Function Call {} (",t.func_name.ident);
+            for expr in t.args
+            {
+                dump_expr(expr);
+                fmt.printf(" ");
+            }
+            fmt.printf(")");
+        }
     }
 }
 
@@ -342,9 +385,9 @@ dump_expr :: proc(expr : ^Expr)
     }
 }
 
-dump_stmt :: proc(stmt : Stmt)
+dump_stmt :: proc(stmt : ^Stmt)
 {
-    switch st in stmt
+    switch &st in stmt
     {
         case DeclStmt:
         {
@@ -358,17 +401,22 @@ dump_stmt :: proc(stmt : Stmt)
             dump_expr(st.expr);
             fmt.printf("\n");
         }
+        case Expr :
+        {
+            dump_expr(&st);
+            fmt.printf("\n");
+        }
     }
 }
 
 dump_ast :: proc(ast : ^AST)
 {
-    for func in ast.funcs
+    for &func in ast.funcs
     {
-        fmt.printf("function : {}\n",func.func_name);
-        for stmt in func.stmts
+        fmt.printf("function : {} {}\n",func.func_name,len(func.stmts));
+        for &stmt in func.stmts
         {
-            dump_stmt(stmt);
+            dump_stmt(&stmt);
         }
     }
 }
