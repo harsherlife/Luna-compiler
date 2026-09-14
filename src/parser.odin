@@ -16,7 +16,7 @@ TermFunCall :: struct
 {
     func_name : Token,
     args : [dynamic]^Expr,
-}
+};
 
 Term :: union
 {

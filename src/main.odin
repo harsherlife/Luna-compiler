@@ -4,13 +4,16 @@ package main;
 import "core:fmt";
 import "core:os";
 import "core:mem";
+import "core:time";
+
+TIMING :: #config(TIMING,false);
 
 
 main ::proc()
 {
 
     when ODIN_DEBUG {
-		track: mem.Tracking_Allocator;
+		track := mem.Tracking_Allocator{};
 		mem.tracking_allocator_init(&track, context.allocator);
 		context.allocator = mem.tracking_allocator(&track);
 
@@ -28,6 +31,7 @@ main ::proc()
     arena := get_arena();
     defer free_arena(&arena);
     old_alloc := context.allocator;
+    defer context.allocator = old_alloc;
     context.allocator = mem.arena_allocator(&arena);
 
     compiler_options := parse_args(os.args);
@@ -37,10 +41,29 @@ main ::proc()
     {
         errorf("error in reading file\n");
     }
-    tokens := tokenize(src_code);
+    when TIMING{
+        clock := time.Stopwatch{};
 
-    ast := parse_ast(tokens);
+        time.stopwatch_start(&clock);
+        tokens := tokenize(src_code);
+        time.stopwatch_stop(&clock);
 
-    dump_ast(&ast);
-    context.allocator = old_alloc;
+        fmt.printf("{} ms\n",get_time_micros(clock));
+        time.stopwatch_reset(&clock);
+
+        time.stopwatch_start(&clock);
+        ast := parse_ast(tokens);
+        time.stopwatch_stop(&clock);
+
+
+        fmt.printf("{} ms\n",get_time_micros(clock));
+        time.stopwatch_reset(&clock);
+    }
+    else
+    {
+        tokens := tokenize(src_code);
+
+        ast := parse_ast(tokens);
+    }
+    dump_ast(&ast);   
 }
