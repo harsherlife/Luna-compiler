@@ -25,6 +25,12 @@ Term :: union
     TermFunCall,
 };
 
+BinExprAssign :: struct
+{
+    lhs,rhs : ^Expr
+};
+
+
 BinExprAdd :: struct
 {
     lhs,rhs : ^Expr
@@ -47,6 +53,7 @@ BinExprDiv :: struct
 
 BinExpr :: union
 {
+    ^BinExprAssign,
     ^BinExprAdd,
     ^BinExprSub,
     ^BinExprMult,
@@ -180,21 +187,28 @@ parse_term :: proc(parser : ^Parser) -> ^Term
 }
 
 
+precedence :[][]TokenType = {{TokenType.assignment},{TokenType.plus,TokenType.minus},{TokenType.mult,TokenType.div}};
+
 get_precedence :: proc (type : TokenType) -> i32
 {
-    #partial switch type
+    idx : i32 = 0;
+    for &slice in precedence
     {
-        case TokenType.plus,TokenType.minus:
-            return 1;
-        case TokenType.mult,TokenType.div:
-            return 2;
-        case :
-            return -1;
-    }    
+        for &slice_type in slice
+        {
+            if type == slice_type
+            {
+                return idx;
+            }
+        }
+        idx += 1;
+    }
+    return -1;
+
 }
 
 
-parse_expr :: proc(parser : ^Parser,prec : i32 = 0 ) -> ^Expr
+parse_expr :: proc(parser : ^Parser,prec : i32 = 0) -> ^Expr
 {
     term := parse_term(parser);
     lhs_expr := alloc_and_set(Expr,term);
@@ -230,6 +244,11 @@ parse_expr :: proc(parser : ^Parser,prec : i32 = 0 ) -> ^Expr
                     {
                         bin_expr_div := alloc_and_set(BinExprDiv,BinExprDiv{lhs = lhs_expr,rhs = rhs_expr});
                         bin_expr = alloc_and_set(BinExpr,bin_expr_div);
+                    }
+                    case TokenType.assignment:
+                    {
+                        bin_expr_assign := alloc_and_set(BinExprAssign,BinExprAssign{lhs = lhs_expr,rhs = rhs_expr});
+                        bin_expr = alloc_and_set(BinExpr,bin_expr_assign);                       
                     }
                     case :
                         errorf("Unreachable\n");
@@ -271,20 +290,6 @@ parse_decl_stmt :: proc(parser : ^Parser,func : ^Func) -> bool
 }
 
 
-parse_assign_stmt :: proc(parser : ^Parser, func : ^Func) -> bool
-{
-    if !try_peek_parser(parser,TokenType.ident) || !try_peek_parser(parser,TokenType.assignment,1)
-    {
-        return false;
-    }
-    ident := consume_parser(parser);
-    consume_parser(parser);
-
-    append(&func.stmts,AssignStmt{ident = ident, expr = parse_expr(parser)});
-    try_consume_err(parser,TokenType.semicolon,"Expected ;\n");
-    return true;
-}
-
 parse_stmt_expr :: proc(parser : ^Parser,func : ^Func) -> bool
 {
     expr := parse_expr(parser);
@@ -303,18 +308,11 @@ parse_stmt :: proc(parser : ^Parser,func : ^Func)
     {
         return;
     }
-    else if parse_assign_stmt(parser,func)
-    {
-        return;
-    }
     else if parse_stmt_expr(parser,func)
     {
         return;
     }
-    else 
-    {
-        errorf("Can't parse statement\n");
-    }
+    errorf("Can't parse statement\n");
 }
 
 parse_function :: proc(parser : ^Parser) -> Func
@@ -389,6 +387,15 @@ dump_term :: proc(term : ^Term)
     }
 }
 
+dump_bin_expr_assign :: proc(bin_expr : ^BinExprAssign)
+{
+    fmt.printf("(=, lhs = ")
+    dump_expr(bin_expr.lhs);
+    fmt.printf(" ,rhs = ");
+    dump_expr(bin_expr.rhs);
+    fmt.printf(")");
+}
+
 dump_bin_expr_add :: proc(bin_expr : ^BinExprAdd)
 {
     fmt.printf("(+, lhs = ")
@@ -430,6 +437,10 @@ dump_bin_expr :: proc(bin_expr : ^BinExpr)
 {
     switch v in bin_expr
     {
+        case ^BinExprAssign:
+        {
+            dump_bin_expr_assign(v);
+        }
         case ^BinExprAdd:
         {
             dump_bin_expr_add(v);
